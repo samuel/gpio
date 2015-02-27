@@ -7,6 +7,8 @@ import (
 	"sync"
 )
 
+type PullDirection uint8
+
 const (
 	// Physical addresses for various peripheral register sets
 
@@ -98,6 +100,10 @@ const (
 	GPIO24 = GPIO_P1_18
 	GPIO27 = GPIO_P1_13
 	GPIO17 = GPIO_P1_11
+
+	PullNone PullDirection = 0
+	PullDown PullDirection = 1
+	PullUp   PullDirection = 2
 )
 
 func initRPi() {

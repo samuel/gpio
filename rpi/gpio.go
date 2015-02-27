@@ -1,15 +1,18 @@
 package rpi
 
 import (
+	"errors"
 	"log"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/davecheney/gpio"
 )
 
 var (
-	gpfsel, gpset, gpclr, gplev []*uint32
+	gpfsel, gpset, gpclr, gplev, gppupdnclk []*uint32
+	gppupdn                                 *uint32
 )
 
 func initGPIO(memfd int) {
@@ -37,6 +40,11 @@ func initGPIO(memfd int) {
 		(*uint32)(unsafe.Pointer(&buf[BCM2835_GPLEV0])),
 		(*uint32)(unsafe.Pointer(&buf[BCM2835_GPLEV1])),
 	}
+	gppupdnclk = []*uint32{
+		(*uint32)(unsafe.Pointer(&buf[BCM2835_GPPUDCLK0])),
+		(*uint32)(unsafe.Pointer(&buf[BCM2835_GPPUDCLK1])),
+	}
+	gppupdn = (*uint32)(unsafe.Pointer(&buf[BCM2835_GPPUD]))
 }
 
 // pin represents a specalised RPi GPIO pin with fast paths for
@@ -79,4 +87,22 @@ func GPIOFSel(pin, mode uint8) {
 	value &= ^uint32(mask)
 	value |= uint32(mode) << shift
 	*gpfsel[offset] = value & mask
+}
+
+func GPIOSetPullUpDown(pin uint8, dir PullDirection) error {
+	if int(dir) > 2 {
+		return errors.New("pull direction must be PullDown, PullUp, or PullOff")
+	}
+
+	offset := pin / 32
+	shift := pin % 32
+
+	*gppupdn = (*gppupdn & ^uint32(3)) | uint32(dir)
+	time.Sleep(time.Microsecond*5)
+	*gppupdnclk[offset] = uint32(1 << shift)
+	time.Sleep(time.Microsecond*5)
+	*gppupdn &^= 3
+	*gppupdnclk[offset] = 0
+
+	return nil
 }
